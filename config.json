@@ -1,0 +1,32 @@
+{
+  "notification": {
+    "enabled": true,
+    "sound": {
+      "enabled": true,
+      "file": "/System/Library/Sounds/Glass.aiff"
+    },
+    "speech": {
+      "enabled": false,
+      "voice": "Samantha",
+      "rate": 200
+    }
+  },
+  "triggers": {
+    "keywords": [
+      "該怎麼做",
+      "怎麼做",
+      "如何",
+      "請問",
+      "您想",
+      "要選擇",
+      "how to",
+      "what should",
+      "which",
+      "please",
+      "would you like"
+    ]
+  },
+  "system": {
+    "language": "auto"
+  }
+}

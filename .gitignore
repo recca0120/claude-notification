@@ -1,0 +1,46 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Test output
+*.out
+
+# Config overrides (keep only the default)
+config.local.json
+.config/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Test coverage
+coverage/
+.coverage
+
+# Node modules (if any)
+node_modules/
+
+# Python (if any)
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Backup files
+*.bak
+*.backup
+
+# User-specific configs
+~/.config/claude-notification/

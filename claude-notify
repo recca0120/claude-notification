@@ -1,0 +1,259 @@
+#!/bin/bash
+
+# Claude Notify - Unified CLI Interface
+VERSION="1.0.0"
+
+# Get script directory
+MAIN_SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "$MAIN_SCRIPT_DIR/lib/config-reader.sh"
+source "$MAIN_SCRIPT_DIR/lib/i18n.sh"
+
+# Default config locations
+USER_CONFIG="$HOME/.config/claude-notification/config.json"
+LOCAL_CONFIG="$MAIN_SCRIPT_DIR/config.json"
+CONFIG_FILE="${CONFIG_FILE:-$LOCAL_CONFIG}"
+
+# Functions
+show_help() {
+    local lang=$(get_system_language)
+    
+    echo "$(get_text "help.title")"
+    echo
+    echo "$(get_text "help.usage")"
+    if [ "$lang" = "zh" ]; then
+        cat << EOF
+  claude-notify <標題> <訊息> [選項]
+  claude-notify config <命令> [參數]
+  claude-notify monitor
+  claude-notify --help | --version
+
+$(get_text "help.notify_options")
+  --sound                $(get_text "help.opt.sound")
+  --speak                $(get_text "help.opt.speak")
+  --config <檔案>        $(get_text "help.opt.config")
+
+$(get_text "help.config_commands")
+  config get <鍵>        $(get_text "help.cmd.get")
+  config set <鍵> <值>   $(get_text "help.cmd.set")
+  config list            $(get_text "help.cmd.list")
+  config add-keyword <詞> $(get_text "help.cmd.add_keyword")
+  config remove-keyword <詞> $(get_text "help.cmd.remove_keyword")
+  config reset           $(get_text "help.cmd.reset")
+
+$(get_text "help.monitoring")
+  monitor                $(get_text "help.cmd.monitor")
+
+$(get_text "help.examples")
+  claude-notify "測試" "這是測試訊息"
+  claude-notify config get notification.sound.enabled
+  claude-notify config set notification.sound.enabled true
+  claude-notify monitor
+EOF
+    else
+        cat << EOF
+  claude-notify <title> <message> [options]
+  claude-notify config <command> [args]
+  claude-notify monitor
+  claude-notify --help | --version
+
+$(get_text "help.notify_options")
+  --sound                $(get_text "help.opt.sound")
+  --speak                $(get_text "help.opt.speak")
+  --config <file>        $(get_text "help.opt.config")
+
+$(get_text "help.config_commands")
+  config get <key>       $(get_text "help.cmd.get")
+  config set <key> <val> $(get_text "help.cmd.set")
+  config list            $(get_text "help.cmd.list")
+  config add-keyword <word> $(get_text "help.cmd.add_keyword")
+  config remove-keyword <word> $(get_text "help.cmd.remove_keyword")
+  config reset           $(get_text "help.cmd.reset")
+
+$(get_text "help.monitoring")
+  monitor                $(get_text "help.cmd.monitor")
+
+$(get_text "help.examples")
+  claude-notify "Test" "This is a test message"
+  claude-notify config get notification.sound.enabled
+  claude-notify config set notification.sound.enabled true
+  claude-notify monitor
+EOF
+    fi
+    echo
+}
+
+show_version() {
+    echo "claude-notify v$VERSION"
+}
+
+# Config management functions
+config_get() {
+    local key="$1"
+    if [ -z "$key" ]; then
+        echo "錯誤：請提供設定鍵" >&2
+        return 1
+    fi
+    get_config_value "$key"
+}
+
+config_set() {
+    local key="$1"
+    local value="$2"
+    
+    if [ -z "$key" ] || [ -z "$value" ]; then
+        echo "錯誤：請提供設定鍵和值" >&2
+        return 1
+    fi
+    
+    # Read current config
+    local config=$(cat "$CONFIG_FILE")
+    
+    # Update value using jq
+    local new_config=$(echo "$config" | jq ".$key = $value")
+    
+    if [ $? -eq 0 ]; then
+        echo "$new_config" > "$CONFIG_FILE"
+        echo "已更新: $key = $value"
+    else
+        echo "錯誤：無法更新設定" >&2
+        return 1
+    fi
+}
+
+config_list() {
+    echo "$(get_text "msg.current_config") ($CONFIG_FILE):"
+    echo "========================"
+    
+    # List all settings in flat format
+    jq -r '
+        paths(scalars) as $p |
+        "\($p | join(".")): \(getpath($p))"
+    ' "$CONFIG_FILE" | sort
+}
+
+config_add_keyword() {
+    local keyword="$1"
+    
+    if [ -z "$keyword" ]; then
+        echo "錯誤：請提供關鍵字" >&2
+        return 1
+    fi
+    
+    # Add keyword to array
+    local config=$(cat "$CONFIG_FILE")
+    local new_config=$(echo "$config" | jq ".triggers.keywords += [\"$keyword\"] | .triggers.keywords |= unique")
+    
+    if [ $? -eq 0 ]; then
+        echo "$new_config" > "$CONFIG_FILE"
+        echo "已新增關鍵字: $keyword"
+    else
+        echo "錯誤：無法新增關鍵字" >&2
+        return 1
+    fi
+}
+
+config_remove_keyword() {
+    local keyword="$1"
+    
+    if [ -z "$keyword" ]; then
+        echo "錯誤：請提供關鍵字" >&2
+        return 1
+    fi
+    
+    # Remove keyword from array
+    local config=$(cat "$CONFIG_FILE")
+    local new_config=$(echo "$config" | jq ".triggers.keywords -= [\"$keyword\"]")
+    
+    if [ $? -eq 0 ]; then
+        echo "$new_config" > "$CONFIG_FILE"
+        echo "已移除關鍵字: $keyword"
+    else
+        echo "錯誤：無法移除關鍵字" >&2
+        return 1
+    fi
+}
+
+config_reset() {
+    cat > "$CONFIG_FILE" << 'EOF'
+{
+  "notification": {
+    "enabled": true,
+    "sound": {
+      "enabled": true,
+      "file": "/System/Library/Sounds/Glass.aiff"
+    },
+    "speech": {
+      "enabled": false,
+      "voice": "Samantha",
+      "rate": 200
+    }
+  },
+  "triggers": {
+    "keywords": [
+      "該怎麼做",
+      "怎麼做",
+      "如何",
+      "請問",
+      "您想",
+      "要選擇"
+    ]
+  }
+}
+EOF
+    echo "設定已重設為預設值"
+}
+
+# Main command processing
+case "$1" in
+    --help|-h)
+        show_help
+        exit 0
+        ;;
+    --version|-v)
+        show_version
+        exit 0
+        ;;
+    config)
+        shift
+        case "$1" in
+            get)
+                shift
+                config_get "$@"
+                ;;
+            set)
+                shift
+                config_set "$@"
+                ;;
+            list)
+                config_list
+                ;;
+            add-keyword)
+                shift
+                config_add_keyword "$@"
+                ;;
+            remove-keyword)
+                shift
+                config_remove_keyword "$@"
+                ;;
+            reset)
+                config_reset
+                ;;
+            *)
+                echo "未知的設定命令: $1" >&2
+                show_help
+                exit 1
+                ;;
+        esac
+        ;;
+    monitor)
+        exec "$MAIN_SCRIPT_DIR/claude-monitor.sh"
+        ;;
+    *)
+        # Default: send notification
+        if [ -z "$1" ] || [ -z "$2" ]; then
+            show_help
+            exit 1
+        fi
+        exec "$MAIN_SCRIPT_DIR/claude-notify.sh" "$@"
+        ;;
+esac
