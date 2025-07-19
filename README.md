@@ -172,17 +172,24 @@ claude | ./claude-notify monitor
 如果需要手動設定，編輯 `~/.claude/settings.json`：
 
 ```bash
-# 1. 基本設定（推薦）
+# 1. 基本設定（推薦）- 按照官方文件順序
 {
   "hooks": {
-    "Stop": [{
+    "Notification": [{
       "matcher": ".*",
       "hooks": [{
         "type": "command",
         "command": "/path/to/claude-hook-processor.sh"
       }]
     }],
-    "Notification": [{
+    "UserPromptSubmit": [{
+      "matcher": ".*",
+      "hooks": [{
+        "type": "command",
+        "command": "/path/to/claude-hook-processor.sh"
+      }]
+    }],
+    "Stop": [{
       "matcher": ".*",
       "hooks": [{
         "type": "command",
@@ -425,17 +432,24 @@ Use the provided setup script:
 If you need to manually configure, edit `~/.claude/settings.json`:
 
 ```bash
-# 1. Basic setup (recommended)
+# 1. Basic setup (recommended) - Following official documentation order
 {
   "hooks": {
-    "Stop": [{
+    "Notification": [{
       "matcher": ".*",
       "hooks": [{
         "type": "command",
         "command": "/path/to/claude-hook-processor.sh"
       }]
     }],
-    "Notification": [{
+    "UserPromptSubmit": [{
+      "matcher": ".*",
+      "hooks": [{
+        "type": "command",
+        "command": "/path/to/claude-hook-processor.sh"
+      }]
+    }],
+    "Stop": [{
       "matcher": ".*",
       "hooks": [{
         "type": "command",

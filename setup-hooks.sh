@@ -124,11 +124,11 @@ setup_hooks() {
     case "$choice" in
         1)
             info "Setting up essential notification hooks..."
-            # Merge hooks instead of overwriting
+            # Merge hooks instead of overwriting (按照觸發順序)
             settings=$(echo "$settings" | jq --arg cmd "$hook_processor_path" '
                 # Initialize hooks object if it does not exist
                 .hooks //= {} |
-                # Merge UserPromptSubmit hooks
+                # 1. Merge UserPromptSubmit hooks (最先觸發)
                 .hooks.UserPromptSubmit = (
                     (.hooks.UserPromptSubmit // []) + [{
                         "matcher": ".*",
@@ -138,7 +138,7 @@ setup_hooks() {
                         }]
                     }] | unique_by(.matcher)
                 ) |
-                # Merge Stop hooks
+                # 2. Merge Stop hooks (最後觸發)
                 .hooks.Stop = (
                     (.hooks.Stop // []) + [{
                         "matcher": ".*",
@@ -148,7 +148,7 @@ setup_hooks() {
                         }]
                     }] | unique_by(.matcher)
                 ) |
-                # Merge Notification hooks
+                # 3. Merge Notification hooks (獨立觸發)
                 .hooks.Notification = (
                     (.hooks.Notification // []) + [{
                         "matcher": ".*",
@@ -180,11 +180,11 @@ setup_hooks() {
             ;;
         3)
             info "Setting up all hooks..."
-            # Merge all hooks instead of overwriting
+            # Merge all hooks instead of overwriting (按照實際觸發順序)
             settings=$(echo "$settings" | jq --arg cmd "$hook_processor_path" '
                 # Initialize hooks object if it does not exist
                 .hooks //= {} |
-                # Merge UserPromptSubmit hooks
+                # 1. Merge UserPromptSubmit hooks (最先觸發)
                 .hooks.UserPromptSubmit = (
                     (.hooks.UserPromptSubmit // []) + [{
                         "matcher": ".*",
@@ -194,37 +194,7 @@ setup_hooks() {
                         }]
                     }] | unique_by(.matcher)
                 ) |
-                # Merge Stop hooks
-                .hooks.Stop = (
-                    (.hooks.Stop // []) + [{
-                        "matcher": ".*",
-                        "hooks": [{
-                            "type": "command",
-                            "command": $cmd
-                        }]
-                    }] | unique_by(.matcher)
-                ) |
-                # Merge Notification hooks
-                .hooks.Notification = (
-                    (.hooks.Notification // []) + [{
-                        "matcher": ".*",
-                        "hooks": [{
-                            "type": "command",
-                            "command": $cmd
-                        }]
-                    }] | unique_by(.matcher)
-                ) |
-                # Merge SubagentStop hooks
-                .hooks.SubagentStop = (
-                    (.hooks.SubagentStop // []) + [{
-                        "matcher": ".*",
-                        "hooks": [{
-                            "type": "command",
-                            "command": $cmd
-                        }]
-                    }] | unique_by(.matcher)
-                ) |
-                # Merge PreToolUse hooks
+                # 2. Merge PreToolUse hooks
                 .hooks.PreToolUse = (
                     (.hooks.PreToolUse // []) + [{
                         "matcher": ".*",
@@ -234,10 +204,50 @@ setup_hooks() {
                         }]
                     }] | unique_by(.matcher)
                 ) |
-                # Merge PostToolUse hooks
+                # 3. Merge PostToolUse hooks
                 .hooks.PostToolUse = (
                     (.hooks.PostToolUse // []) + [{
                         "matcher": "(Bash|Edit|Write|MultiEdit)",
+                        "hooks": [{
+                            "type": "command",
+                            "command": $cmd
+                        }]
+                    }] | unique_by(.matcher)
+                ) |
+                # 4. Merge SubagentStop hooks (Task 工具使用時)
+                .hooks.SubagentStop = (
+                    (.hooks.SubagentStop // []) + [{
+                        "matcher": ".*",
+                        "hooks": [{
+                            "type": "command",
+                            "command": $cmd
+                        }]
+                    }] | unique_by(.matcher)
+                ) |
+                # 5. Merge Stop hooks (最後觸發)
+                .hooks.Stop = (
+                    (.hooks.Stop // []) + [{
+                        "matcher": ".*",
+                        "hooks": [{
+                            "type": "command",
+                            "command": $cmd
+                        }]
+                    }] | unique_by(.matcher)
+                ) |
+                # 6. Merge Notification hooks (獨立觸發)
+                .hooks.Notification = (
+                    (.hooks.Notification // []) + [{
+                        "matcher": ".*",
+                        "hooks": [{
+                            "type": "command",
+                            "command": $cmd
+                        }]
+                    }] | unique_by(.matcher)
+                ) |
+                # 7. Merge PreCompact hooks (特殊情況)
+                .hooks.PreCompact = (
+                    (.hooks.PreCompact // []) + [{
+                        "matcher": ".*",
                         "hooks": [{
                             "type": "command",
                             "command": $cmd
@@ -293,11 +303,14 @@ show_usage() {
     echo
     echo "The Claude notification system is now integrated with Claude Code."
     echo
-    echo "How it works:"
-    echo "- UserPromptSubmit: Detects when user interrupts or provides input"
-    echo "- Stop: Detects when Claude completes execution"
-    echo "- Notification: Detects when Claude needs permission or user confirmation"
+    echo "How it works (按照觸發順序):"
+    echo "- UserPromptSubmit: Detects when user interrupts or provides input (最先觸發)"
+    echo "- PreToolUse: Validates and can block tool execution (optional)"
     echo "- PostToolUse: Monitors file changes and command executions (optional)"
+    echo "- SubagentStop: Detects when subagent completes task (optional)"
+    echo "- Stop: Detects when Claude completes execution (最後觸發)"
+    echo "- Notification: Detects when Claude needs permission or user confirmation (獨立觸發)"
+    echo "- PreCompact: Detects when context needs compression (特殊情況)"
     echo
     echo "The hooks will automatically trigger notifications for:"
     echo "1. When Claude needs user input or is interrupted"
