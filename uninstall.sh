@@ -20,7 +20,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Default paths (can be overridden for testing)
-INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
+INSTALL_BASE="${INSTALL_BASE:-$HOME/.local/bin/claude-notifier}"
 CONFIG_DIR="${CONFIG_DIR:-$HOME/.config/claude-notification}"
 CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
 
@@ -43,27 +43,14 @@ prompt() {
 
 # Remove installed files
 remove_installed_files() {
-    info "Removing installed files from $INSTALL_DIR..."
+    info "Removing installed files from $INSTALL_BASE..."
     
-    local files=(
-        "claude-notify"
-        "claude-notify.sh"
-        "claude-monitor.sh"
-        "claude-hook-processor.sh"
-        "setup-hooks.sh"
-    )
-    
-    for file in "${files[@]}"; do
-        if [ -f "$INSTALL_DIR/$file" ] || [ -L "$INSTALL_DIR/$file" ]; then
-            rm -f "$INSTALL_DIR/$file"
-            info "Removed $file"
-        fi
-    done
-    
-    # Remove lib directory
-    if [ -d "$INSTALL_DIR/lib" ]; then
-        rm -rf "$INSTALL_DIR/lib"
-        info "Removed lib directory"
+    # Remove entire installation directory
+    if [ -d "$INSTALL_BASE" ]; then
+        rm -rf "$INSTALL_BASE"
+        info "Removed installation directory: $INSTALL_BASE"
+    else
+        warn "Installation directory not found: $INSTALL_BASE"
     fi
 }
 
@@ -94,7 +81,7 @@ clean_claude_hooks() {
             
             # Remove hooks that point to our scripts
             if command -v jq &> /dev/null; then
-                local hook_path="$INSTALL_DIR/claude-hook-processor.sh"
+                local hook_path="$INSTALL_BASE/scripts/claude-hook-processor.sh"
                 jq --arg path "$hook_path" '
                     .hooks |= with_entries(
                         .value |= map(select(.hooks[0].command != $path))
@@ -117,7 +104,7 @@ clean_path() {
     local shell_configs=("$HOME/.zshrc" "$HOME/.bashrc")
     
     for rc_file in "${shell_configs[@]}"; do
-        if [ -f "$rc_file" ] && grep -q "$INSTALL_DIR" "$rc_file"; then
+        if [ -f "$rc_file" ] && grep -q "$INSTALL_BASE/bin" "$rc_file"; then
             warn "Found PATH entry in $rc_file"
             read -p "Remove PATH entry? (y/N) " -n 1 -r
             echo
@@ -141,7 +128,7 @@ show_summary() {
     echo "======================================"
     echo
     echo "The following actions were performed:"
-    echo "- Removed executable files from $INSTALL_DIR"
+    echo "- Removed installation directory: $INSTALL_BASE"
     [ ! -d "$CONFIG_DIR" ] && echo "- Removed configuration files"
     echo
     echo "Thank you for using Claude Notification System!"

@@ -16,8 +16,9 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# 預設安裝路徑
-INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
+# 預設安裝路徑 - 使用獨立資料夾
+INSTALL_BASE="${INSTALL_BASE:-$HOME/.local/bin/claude-notifier}"
+INSTALL_DIR="$INSTALL_BASE"
 CONFIG_DIR="$HOME/.config/claude-notification"
 
 # 顯示訊息
@@ -68,33 +69,32 @@ install_files() {
     info "$(get_text "install.installing")"
     
     # 建立必要的目錄結構
-    LOCAL_INSTALL_BASE="$HOME/.local"
-    mkdir -p "$LOCAL_INSTALL_BASE/bin"
-    mkdir -p "$LOCAL_INSTALL_BASE/lib"
-    mkdir -p "$LOCAL_INSTALL_BASE/scripts"
+    mkdir -p "$INSTALL_BASE/bin"
+    mkdir -p "$INSTALL_BASE/lib"
+    mkdir -p "$INSTALL_BASE/scripts"
     
     # 複製主程式
-    cp -f "$REPO_DIR/claude-notify" "$LOCAL_INSTALL_BASE/bin/"
-    chmod +x "$LOCAL_INSTALL_BASE/bin/claude-notify"
+    cp -f "$REPO_DIR/claude-notify" "$INSTALL_BASE/bin/"
+    chmod +x "$INSTALL_BASE/bin/claude-notify"
     
     # 複製腳本
-    cp -f "$REPO_DIR/scripts/claude-notify.sh" "$LOCAL_INSTALL_BASE/scripts/"
-    cp -f "$REPO_DIR/scripts/claude-monitor.sh" "$LOCAL_INSTALL_BASE/scripts/"
-    cp -f "$REPO_DIR/scripts/claude-hook-processor.sh" "$LOCAL_INSTALL_BASE/scripts/"
-    chmod +x "$LOCAL_INSTALL_BASE/scripts/"*.sh
+    cp -f "$REPO_DIR/scripts/claude-notify.sh" "$INSTALL_BASE/scripts/"
+    cp -f "$REPO_DIR/scripts/claude-monitor.sh" "$INSTALL_BASE/scripts/"
+    cp -f "$REPO_DIR/scripts/claude-hook-processor.sh" "$INSTALL_BASE/scripts/"
+    chmod +x "$INSTALL_BASE/scripts/"*.sh
     
     # 複製函式庫
-    cp -rf "$REPO_DIR/lib/"* "$LOCAL_INSTALL_BASE/lib/"
+    cp -rf "$REPO_DIR/lib/"* "$INSTALL_BASE/lib/"
     
     # 複製 setup-hooks.sh 到安裝目錄
-    cp -f "$REPO_DIR/setup-hooks.sh" "$LOCAL_INSTALL_BASE/bin/"
-    chmod +x "$LOCAL_INSTALL_BASE/bin/setup-hooks.sh"
+    cp -f "$REPO_DIR/setup-hooks.sh" "$INSTALL_BASE/bin/"
+    chmod +x "$INSTALL_BASE/bin/setup-hooks.sh"
     
     # 複製設定檔（如果不存在）
     if [ ! -f "$CONFIG_DIR/config.json" ]; then
         cp "$REPO_DIR/config.json" "$CONFIG_DIR/"
-        # 同時複製到 .local 目錄以供相容性
-        cp "$REPO_DIR/config.json" "$LOCAL_INSTALL_BASE/"
+        # 同時複製到安裝目錄以供相容性
+        cp "$REPO_DIR/config.json" "$INSTALL_BASE/"
         info "$(get_text "install.config_created") $CONFIG_DIR/config.json"
     else
         warn "$(get_text "install.config_exists")"
@@ -122,12 +122,14 @@ setup_path() {
     esac
     
     if [ -n "$RC_FILE" ]; then
+        # 需要將 bin 目錄加入 PATH
+        BIN_DIR="$INSTALL_BASE/bin"
         # 檢查 PATH 是否已包含安裝目錄
-        if ! grep -q "$INSTALL_DIR" "$RC_FILE" 2>/dev/null; then
+        if ! grep -q "$BIN_DIR" "$RC_FILE" 2>/dev/null; then
             echo "" >> "$RC_FILE"
             echo "# Claude Notify" >> "$RC_FILE"
-            echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$RC_FILE"
-            info "已將 $INSTALL_DIR 加入 PATH"
+            echo "export PATH=\"\$PATH:$BIN_DIR\"" >> "$RC_FILE"
+            info "已將 $BIN_DIR 加入 PATH"
             warn "請執行 'source $RC_FILE' 或重新開啟終端機"
         else
             info "PATH 已包含安裝目錄"
@@ -144,21 +146,21 @@ interactive_setup() {
     read -p "$(get_text "install.enable_sound") " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        "$INSTALL_DIR/claude-notify" config set notification.sound.enabled true
+        "$INSTALL_BASE/bin/claude-notify" config set notification.sound.enabled true
     fi
     
     # 詢問是否啟用語音
     read -p "$(get_text "install.enable_speech") " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        "$INSTALL_DIR/claude-notify" config set notification.speech.enabled true
+        "$INSTALL_BASE/bin/claude-notify" config set notification.speech.enabled true
     fi
     
     # 測試通知
     read -p "$(get_text "install.test_notify") " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        "$INSTALL_DIR/claude-notify" "$(get_text "install.success_title")" "$(get_text "install.success_msg")"
+        "$INSTALL_BASE/bin/claude-notify" "$(get_text "install.success_title")" "$(get_text "install.success_msg")"
     fi
     
     # 詢問是否設定 Claude Code hooks
@@ -166,7 +168,7 @@ interactive_setup() {
     read -p "Would you like to set up Claude Code hooks integration? (Y/n) " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        "$INSTALL_DIR/setup-hooks.sh"
+        "$INSTALL_BASE/bin/setup-hooks.sh"
     fi
 }
 
@@ -175,7 +177,7 @@ show_completion() {
     echo
     echo -e "${GREEN}$(get_text "install.complete")${NC}"
     echo "========================"
-    echo "claude-notify installed to: $INSTALL_DIR"
+    echo "claude-notify installed to: $INSTALL_BASE"
     echo "Config location: $CONFIG_DIR/config.json"
     echo
     echo "Usage:"

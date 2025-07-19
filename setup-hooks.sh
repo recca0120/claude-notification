@@ -110,7 +110,7 @@ setup_hooks() {
         # Ask user which hooks to enable
         echo
         prompt "Which hooks would you like to enable?"
-        echo "1) Essential hooks (UserPromptSubmit, Stop) - Recommended"
+        echo "1) Essential hooks (UserPromptSubmit, Stop, Notification) - Recommended"
         echo "2) PostToolUse hook only (file change monitoring)"
         echo "3) All hooks (complete monitoring)"
         echo "4) Skip hook setup"
@@ -141,6 +141,16 @@ setup_hooks() {
                 # Merge Stop hooks
                 .hooks.Stop = (
                     (.hooks.Stop // []) + [{
+                        "matcher": ".*",
+                        "hooks": [{
+                            "type": "command",
+                            "command": $cmd
+                        }]
+                    }] | unique_by(.matcher)
+                ) |
+                # Merge Notification hooks
+                .hooks.Notification = (
+                    (.hooks.Notification // []) + [{
                         "matcher": ".*",
                         "hooks": [{
                             "type": "command",
@@ -187,6 +197,16 @@ setup_hooks() {
                 # Merge Stop hooks
                 .hooks.Stop = (
                     (.hooks.Stop // []) + [{
+                        "matcher": ".*",
+                        "hooks": [{
+                            "type": "command",
+                            "command": $cmd
+                        }]
+                    }] | unique_by(.matcher)
+                ) |
+                # Merge Notification hooks
+                .hooks.Notification = (
+                    (.hooks.Notification // []) + [{
                         "matcher": ".*",
                         "hooks": [{
                             "type": "command",
@@ -276,12 +296,14 @@ show_usage() {
     echo "How it works:"
     echo "- UserPromptSubmit: Detects when user interrupts or provides input"
     echo "- Stop: Detects when Claude completes execution"
+    echo "- Notification: Detects when Claude needs permission or user confirmation"
     echo "- PostToolUse: Monitors file changes and command executions (optional)"
     echo
     echo "The hooks will automatically trigger notifications for:"
     echo "1. When Claude needs user input or is interrupted"
     echo "2. When Claude completes a task"
-    echo "3. File modifications (if PostToolUse is enabled)"
+    echo "3. When Claude needs permission or confirmation"
+    echo "4. File modifications (if PostToolUse is enabled)"
     echo
     echo "To test the integration:"
     echo "1. Open Claude Code"
