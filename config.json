@@ -28,5 +28,9 @@
   },
   "system": {
     "language": "auto"
+  },
+  "logging": {
+    "enabled": true,
+    "level": "debug"
   }
 }

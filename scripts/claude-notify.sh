@@ -5,9 +5,10 @@
 
 # Get script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
 # Source config reader
-source "$SCRIPT_DIR/lib/config-reader.sh"
+source "$PROJECT_ROOT/lib/config-reader.sh"
 
 # Default values
 TITLE="$1"
@@ -16,6 +17,7 @@ SOUND_ENABLED=false
 SPEAK_ENABLED=false
 SOUND_FILE="/System/Library/Sounds/Glass.aiff"
 CUSTOM_CONFIG=""
+TEST_MODE=false
 
 # Parse command line arguments
 shift 2  # Remove title and message from arguments
@@ -32,6 +34,10 @@ while [[ $# -gt 0 ]]; do
         --config)
             CUSTOM_CONFIG="$2"
             shift 2
+            ;;
+        --test)
+            TEST_MODE=true
+            shift
             ;;
         *)
             shift
@@ -66,17 +72,33 @@ if [ -z "$TITLE" ] || [ -z "$MESSAGE" ]; then
     exit 1
 fi
 
-# Send notification using terminal-notifier
-terminal-notifier -title "$TITLE" -message "$MESSAGE" -sender com.anthropic.claude
+# Send notification using osascript (more reliable on modern macOS)
+# Check if notification is enabled
+NOTIFICATION_ENABLED=$(get_config_value "notification.enabled")
+if [ "$NOTIFICATION_ENABLED" != "false" ]; then
+    if [ "$TEST_MODE" = "true" ]; then
+        echo "[TEST MODE] Would send notification: $TITLE - $MESSAGE"
+    else
+        osascript -e "display notification \"$MESSAGE\" with title \"$TITLE\""
+    fi
+fi
 
 # Play sound if enabled
 if [ "$SOUND_ENABLED" = true ]; then
-    afplay "$SOUND_FILE" &
+    if [ "$TEST_MODE" = "true" ]; then
+        echo "[TEST MODE] Would play sound: $SOUND_FILE"
+    else
+        afplay "$SOUND_FILE" &
+    fi
 fi
 
 # Speak message if enabled
 if [ "$SPEAK_ENABLED" = true ]; then
-    say "$MESSAGE" &
+    if [ "$TEST_MODE" = "true" ]; then
+        echo "[TEST MODE] Would speak: $MESSAGE"
+    else
+        say "$MESSAGE" &
+    fi
 fi
 
 exit 0

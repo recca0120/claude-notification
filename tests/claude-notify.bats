@@ -6,7 +6,7 @@ setup() {
     # Setup test environment
     export SCRIPT_DIR="$( cd "$( dirname "$BATS_TEST_FILENAME" )" && pwd )"
     export PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-    export CLAUDE_NOTIFY="$PROJECT_ROOT/claude-notify.sh"
+    export CLAUDE_NOTIFY="$PROJECT_ROOT/scripts/claude-notify.sh"
     export CONFIG_FILE="$PROJECT_ROOT/config.json"
 }
 
@@ -28,8 +28,9 @@ setup() {
 }
 
 @test "succeeds with title and message" {
-    run "$CLAUDE_NOTIFY" "Test Title" "Test Message"
+    run "$CLAUDE_NOTIFY" "Test Title" "Test Message" --test
     [ "$status" -eq 0 ]
+    [[ "$output" =~ "[TEST MODE] Would send notification" ]]
 }
 
 @test "config.json exists" {
@@ -42,22 +43,27 @@ setup() {
 }
 
 @test "notification with sound flag" {
-    run "$CLAUDE_NOTIFY" "Test Title" "Test Message" --sound
+    run "$CLAUDE_NOTIFY" "Test Title" "Test Message" --sound --test
     [ "$status" -eq 0 ]
+    [[ "$output" =~ "[TEST MODE] Would play sound" ]]
 }
 
 @test "notification with speak flag" {
-    run "$CLAUDE_NOTIFY" "Test Title" "Test Message" --speak
+    run "$CLAUDE_NOTIFY" "Test Title" "Test Message" --speak --test
     [ "$status" -eq 0 ]
+    [[ "$output" =~ "[TEST MODE] Would speak" ]]
 }
 
 @test "notification with both sound and speak flags" {
-    run "$CLAUDE_NOTIFY" "Test Title" "Test Message" --sound --speak
+    run "$CLAUDE_NOTIFY" "Test Title" "Test Message" --sound --speak --test
     [ "$status" -eq 0 ]
+    [[ "$output" =~ "[TEST MODE] Would play sound" ]]
+    [[ "$output" =~ "[TEST MODE] Would speak" ]]
 }
 
-@test "terminal-notifier is available" {
-    run which terminal-notifier
+@test "osascript is available" {
+    # macOS built-in tool for notifications
+    run which osascript
     [ "$status" -eq 0 ]
 }
 

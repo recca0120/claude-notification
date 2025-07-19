@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install dependencies
+      run: |
+        brew install jq
+    
+    - name: Create release archive
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        RELEASE_NAME="claude-notification-${VERSION}"
+        
+        # Create release directory
+        mkdir -p "$RELEASE_NAME"
+        
+        # Copy files
+        cp -r claude-notify claude-notify.sh claude-monitor.sh "$RELEASE_NAME/"
+        cp -r claude-hook-processor.sh setup-hooks.sh "$RELEASE_NAME/"
+        cp -r lib "$RELEASE_NAME/"
+        cp -r config.json README.md LICENSE "$RELEASE_NAME/" 2>/dev/null || true
+        cp install.sh "$RELEASE_NAME/"
+        
+        # Create archives
+        tar -czf "${RELEASE_NAME}.tar.gz" "$RELEASE_NAME"
+        zip -r "${RELEASE_NAME}.zip" "$RELEASE_NAME"
+        
+        # Generate checksums
+        shasum -a 256 "${RELEASE_NAME}.tar.gz" > "${RELEASE_NAME}.tar.gz.sha256"
+        shasum -a 256 "${RELEASE_NAME}.zip" > "${RELEASE_NAME}.zip.sha256"
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          claude-notification-*.tar.gz
+          claude-notification-*.tar.gz.sha256
+          claude-notification-*.zip
+          claude-notification-*.zip.sha256
+        generate_release_notes: true
+        draft: false
+        prerelease: false

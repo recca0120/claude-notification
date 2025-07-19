@@ -94,7 +94,8 @@ teardown() {
 @test "help command" {
     run "$CLAUDE_NOTIFY" --help
     [ "$status" -eq 0 ]
-    [[ "$output" =~ "使用方式:" ]]
+    # Check for either Chinese or English usage text
+    [[ "$output" =~ "Usage" ]] || [[ "$output" =~ "使用方式" ]]
 }
 
 @test "version command" {

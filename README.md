@@ -1,27 +1,39 @@
 # Claude Notification System
 
+[![Tests](https://github.com/recca0120/claude-notification/actions/workflows/test.yml/badge.svg)](https://github.com/recca0120/claude-notification/actions/workflows/test.yml)
+
 [中文](#中文) | [English](#english)
 
 ---
 
 ## 中文
 
-當 Claude 詢問問題時自動發送通知的 macOS 工具。
+為 Claude Code 提供智能通知系統的 macOS 工具。當 Claude 需要您的注意時自動發送通知。
 
 ### 功能特點
 
-- 🔔 系統通知顯示
+- 🔔 系統通知顯示（使用 macOS 內建 osascript）
 - 🔊 可選的聲音提示
 - 🗣️ 可選的語音播報
-- 🔍 自動偵測關鍵字
+- 🚨 智能事件偵測（需要決定、完成、權限請求）
+- 📦 訊息堆疊防止通知轟炸
+- 📝 從對話記錄提取工作總結
 - ⚙️ 可自訂設定
 - 🌐 支援中英文介面
+- 🧪 完整的測試覆蓋
+
+### 通知時機
+
+系統會在以下情況自動發送通知：
+1. **執行完成** - Claude 完成任務執行（會顯示完成的工作總結）
+2. **需要決定** - Claude 詢問您要選擇或確認事項
+3. **權限請求** - Claude 需要您授權使用某個工具
+4. **等待輸入** - 透過關鍵字偵測判斷 Claude 在等待您的回應
 
 ### 安裝需求
 
-- macOS
+- macOS (使用內建的 osascript 發送通知)
 - Homebrew
-- terminal-notifier (會自動安裝)
 - jq (用於讀取 JSON 設定)
 
 ### 安裝步驟
@@ -31,8 +43,20 @@
 ./install.sh
 
 # 或手動安裝依賴
-brew install terminal-notifier
 brew install jq
+```
+
+### 解除安裝
+
+```bash
+# 執行解除安裝腳本
+./uninstall.sh
+
+# 這將會：
+# - 移除已安裝的執行檔
+# - 詢問是否刪除設定檔
+# - 清理 Claude Code hooks 設定
+# - 移除 PATH 設定
 ```
 
 ### 使用方式
@@ -118,6 +142,70 @@ claude | ./claude-notify monitor
   },
   "system": {
     "language": "auto"
+  },
+  "logging": {
+    "enabled": false,
+    "file": "/tmp/claude-hook-debug.log",
+    "level": "info"
+  }
+}
+```
+
+### Claude Code Hooks 整合
+
+與 Claude Code 整合以接收即時通知。
+
+#### 自動設定 (推薦)
+
+使用提供的設定腳本：
+
+```bash
+# 執行 hooks 設定腳本
+./setup-hooks.sh
+
+# 或在安裝時會詢問是否設定 hooks
+./install.sh
+```
+
+#### 手動設定
+
+如果需要手動設定，編輯 `~/.claude/settings.json`：
+
+```bash
+# 1. 基本設定（推薦）
+{
+  "hooks": {
+    "Stop": [{
+      "matcher": ".*",
+      "hooks": [{
+        "type": "command",
+        "command": "/path/to/claude-hook-processor.sh"
+      }]
+    }],
+    "Notification": [{
+      "matcher": ".*",
+      "hooks": [{
+        "type": "command",
+        "command": "/path/to/claude-hook-processor.sh"
+      }]
+    }]
+  }
+}
+
+# 2. 或加入檔案變更監控
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "(Bash|Edit|Write|MultiEdit)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/claude-hook-processor.sh"
+          }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -130,49 +218,76 @@ bats tests/*.bats
 
 # 執行範例測試
 ./examples/test-notification.sh
+
+# 測試模式（不會真的發送通知）
+./claude-notify "測試標題" "測試訊息" --test
 ```
+
+測試執行時不會發送真正的通知、播放聲音或語音。
 
 ### 專案結構
 
 ```
 claude-notification/
-├── claude-notify          # 統一命令介面
-├── claude-notify.sh       # 主要通知腳本
-├── claude-monitor.sh      # 監控腳本
-├── config.json           # 設定檔
+├── claude-notify        # 主要執行檔
+├── scripts/              # Shell 腳本
+│   ├── claude-notify.sh  # 主要通知腳本
+│   ├── claude-monitor.sh # 監控腳本
+│   └── claude-hook-processor.sh # Hook 處理器
 ├── lib/                  # 函式庫
 │   ├── config-reader.sh  # 設定讀取器
 │   ├── keyword-detector.sh # 關鍵字偵測器
+│   ├── notification-queue.sh # 通知佇列
 │   └── i18n.sh          # 國際化支援
 ├── tests/                # 測試檔案
+│   ├── mocks/            # 測試用 mock 腳本
+│   │   └── claude-notify
+│   ├── fixtures/         # 測試資料
 │   ├── claude-notify.bats
+│   ├── claude-hook-processor.bats
 │   ├── config-reader.bats
 │   ├── config-manager.bats
-│   └── keyword-detector.bats
-└── examples/             # 範例腳本
-    └── test-notification.sh
+│   ├── keyword-detector.bats
+│   ├── notification-queue.bats
+│   ├── setup-hooks.bats
+│   └── uninstall.bats
+├── install.sh            # 安裝腳本
+├── uninstall.sh          # 解除安裝腳本
+├── setup-hooks.sh        # Hook 設定腳本
+├── config.json           # 設定檔
+└── README.md             # 說明文件
 ```
 
 ---
 
 ## English
 
-A macOS tool that automatically sends notifications when Claude asks questions.
+A smart notification system for Claude Code on macOS. Automatically alerts you when Claude needs your attention.
 
 ### Features
 
-- 🔔 System notifications
+- 🔔 System notifications (using macOS built-in osascript)
 - 🔊 Optional sound alerts
 - 🗣️ Optional text-to-speech
-- 🔍 Automatic keyword detection
+- 🚨 Smart event detection (decisions needed, completion, permission requests)
+- 📦 Message queuing to prevent notification spam
+- 📝 Extracts work summaries from conversation logs
 - ⚙️ Customizable settings
 - 🌐 Bilingual interface (Chinese/English)
+- 🧪 Comprehensive test coverage
+
+### When You'll Get Notifications
+
+The system automatically sends notifications when:
+1. **Task Complete** - Claude finishes executing tasks (shows work summary)
+2. **Decision Needed** - Claude asks you to choose or confirm something
+3. **Permission Request** - Claude needs authorization to use a tool
+4. **Waiting for Input** - Detected through keywords that Claude is waiting for your response
 
 ### Requirements
 
-- macOS
+- macOS (uses built-in osascript for notifications)
 - Homebrew
-- terminal-notifier (auto-installed)
 - jq (for JSON parsing)
 
 ### Installation
@@ -182,8 +297,20 @@ A macOS tool that automatically sends notifications when Claude asks questions.
 ./install.sh
 
 # Or install dependencies manually
-brew install terminal-notifier
 brew install jq
+```
+
+### Uninstallation
+
+```bash
+# Run uninstall script
+./uninstall.sh
+
+# This will:
+# - Remove installed executables
+# - Ask whether to delete config files
+# - Clean up Claude Code hooks settings
+# - Remove PATH entries
 ```
 
 ### Usage
@@ -268,6 +395,70 @@ Edit `config.json` to customize settings:
   },
   "system": {
     "language": "auto"
+  },
+  "logging": {
+    "enabled": false,
+    "file": "/tmp/claude-hook-debug.log",
+    "level": "info"
+  }
+}
+```
+
+### Claude Code Hooks Integration
+
+Integrate with Claude Code for real-time notifications.
+
+#### Automatic Setup (Recommended)
+
+Use the provided setup script:
+
+```bash
+# Run the hooks setup script
+./setup-hooks.sh
+
+# Or it will be offered during installation
+./install.sh
+```
+
+#### Manual Setup
+
+If you need to manually configure, edit `~/.claude/settings.json`:
+
+```bash
+# 1. Basic setup (recommended)
+{
+  "hooks": {
+    "Stop": [{
+      "matcher": ".*",
+      "hooks": [{
+        "type": "command",
+        "command": "/path/to/claude-hook-processor.sh"
+      }]
+    }],
+    "Notification": [{
+      "matcher": ".*",
+      "hooks": [{
+        "type": "command",
+        "command": "/path/to/claude-hook-processor.sh"
+      }]
+    }]
+  }
+}
+
+# 2. Or use PostToolUse hook
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "(Bash|Edit|Write|MultiEdit)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/claude-hook-processor.sh"
+          }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -280,27 +471,44 @@ bats tests/*.bats
 
 # Run example test
 ./examples/test-notification.sh
+
+# Test mode (no actual notifications sent)
+./claude-notify "Test Title" "Test Message" --test
 ```
+
+Tests run without sending actual notifications, playing sounds, or speaking.
 
 ### Project Structure
 
 ```
 claude-notification/
-├── claude-notify          # Unified CLI interface
-├── claude-notify.sh       # Main notification script
-├── claude-monitor.sh      # Monitor script
-├── config.json           # Configuration file
+├── claude-notify        # Main executable
+├── scripts/              # Shell scripts
+│   ├── claude-notify.sh  # Main notification script
+│   ├── claude-monitor.sh # Monitor script
+│   └── claude-hook-processor.sh # Hook processor
 ├── lib/                  # Libraries
 │   ├── config-reader.sh  # Config reader
 │   ├── keyword-detector.sh # Keyword detector
+│   ├── notification-queue.sh # Notification queue
 │   └── i18n.sh          # Internationalization
 ├── tests/                # Test files
+│   ├── mocks/            # Test mock scripts
+│   │   └── claude-notify
+│   ├── fixtures/         # Test data
 │   ├── claude-notify.bats
+│   ├── claude-hook-processor.bats
 │   ├── config-reader.bats
 │   ├── config-manager.bats
-│   └── keyword-detector.bats
-└── examples/             # Example scripts
-    └── test-notification.sh
+│   ├── keyword-detector.bats
+│   ├── notification-queue.bats
+│   ├── setup-hooks.bats
+│   └── uninstall.bats
+├── install.sh            # Installation script
+├── uninstall.sh          # Uninstallation script
+├── setup-hooks.sh        # Hook setup script
+├── config.json           # Configuration file
+└── README.md             # Documentation
 ```
 
 ### Development

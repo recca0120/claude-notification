@@ -44,3 +44,10 @@ __pycache__/
 
 # User-specific configs
 ~/.config/claude-notification/
+
+# Claude specific files
+.claude/
+CLAUDE.md
+
+# Test fixtures
+tests/fixtures/

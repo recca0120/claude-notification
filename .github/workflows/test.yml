@@ -1,0 +1,55 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    
+    - name: Install BATS
+      run: |
+        npm install -g bats
+        bats --version
+    
+    - name: Install dependencies
+      run: |
+        brew install jq
+        # Note: osascript is built-in on macOS
+    
+    - name: Run tests
+      run: |
+        bats tests/*.bats
+    
+    - name: Test installation script
+      run: |
+        # Test install script in non-interactive mode
+        INSTALL_DIR="$HOME/test-install" ./install.sh < /dev/null || true
+        
+        # Check if files were installed
+        test -f "$HOME/test-install/claude-notify"
+        test -f "$HOME/test-install/claude-notify.sh"
+        test -f "$HOME/test-install/claude-monitor.sh"
+    
+    - name: Test notification script
+      run: |
+        # Test basic notification (won't actually show on CI)
+        ./claude-notify "Test" "GitHub Actions Test" || true
+        
+        # Test config commands
+        ./claude-notify config list
+        ./claude-notify config get notification.enabled
+        ./claude-notify --version
+        ./claude-notify --help

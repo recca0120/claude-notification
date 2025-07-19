@@ -4,14 +4,27 @@
 VERSION="1.0.0"
 
 # Get script directory
-MAIN_SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source "$MAIN_SCRIPT_DIR/lib/config-reader.sh"
-source "$MAIN_SCRIPT_DIR/lib/i18n.sh"
+BIN_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Support both installed and development environments
+if [ -d "$BIN_DIR/lib" ]; then
+    # Development environment - lib is in same directory
+    PROJECT_ROOT="$BIN_DIR"
+else
+    # Installed environment - script is in bin subdirectory
+    PROJECT_ROOT="$( cd "$BIN_DIR/.." && pwd )"
+fi
+source "$PROJECT_ROOT/lib/config-reader.sh"
+source "$PROJECT_ROOT/lib/i18n.sh"
 
 # Default config locations
 USER_CONFIG="$HOME/.config/claude-notification/config.json"
-LOCAL_CONFIG="$MAIN_SCRIPT_DIR/config.json"
-CONFIG_FILE="${CONFIG_FILE:-$LOCAL_CONFIG}"
+LOCAL_CONFIG="$PROJECT_ROOT/config.json"
+# Use user config if it exists, otherwise local config
+if [ -f "$USER_CONFIG" ]; then
+    CONFIG_FILE="${CONFIG_FILE:-$USER_CONFIG}"
+else
+    CONFIG_FILE="${CONFIG_FILE:-$LOCAL_CONFIG}"
+fi
 
 # Functions
 show_help() {
@@ -90,7 +103,7 @@ show_version() {
 config_get() {
     local key="$1"
     if [ -z "$key" ]; then
-        echo "錯誤：請提供設定鍵" >&2
+        echo "$(get_text "error.no_key")" >&2
         return 1
     fi
     get_config_value "$key"
@@ -101,7 +114,7 @@ config_set() {
     local value="$2"
     
     if [ -z "$key" ] || [ -z "$value" ]; then
-        echo "錯誤：請提供設定鍵和值" >&2
+        echo "$(get_text "error.no_key_value")" >&2
         return 1
     fi
     
@@ -113,9 +126,9 @@ config_set() {
     
     if [ $? -eq 0 ]; then
         echo "$new_config" > "$CONFIG_FILE"
-        echo "已更新: $key = $value"
+        echo "$(get_text "msg.config_updated") $key = $value"
     else
-        echo "錯誤：無法更新設定" >&2
+        echo "$(get_text "error.update_failed")" >&2
         return 1
     fi
 }
@@ -135,7 +148,7 @@ config_add_keyword() {
     local keyword="$1"
     
     if [ -z "$keyword" ]; then
-        echo "錯誤：請提供關鍵字" >&2
+        echo "$(get_text "error.no_keyword")" >&2
         return 1
     fi
     
@@ -145,9 +158,9 @@ config_add_keyword() {
     
     if [ $? -eq 0 ]; then
         echo "$new_config" > "$CONFIG_FILE"
-        echo "已新增關鍵字: $keyword"
+        echo "$(get_text "msg.keyword_added") $keyword"
     else
-        echo "錯誤：無法新增關鍵字" >&2
+        echo "$(get_text "error.update_failed")" >&2
         return 1
     fi
 }
@@ -156,7 +169,7 @@ config_remove_keyword() {
     local keyword="$1"
     
     if [ -z "$keyword" ]; then
-        echo "錯誤：請提供關鍵字" >&2
+        echo "$(get_text "error.no_keyword")" >&2
         return 1
     fi
     
@@ -166,9 +179,9 @@ config_remove_keyword() {
     
     if [ $? -eq 0 ]; then
         echo "$new_config" > "$CONFIG_FILE"
-        echo "已移除關鍵字: $keyword"
+        echo "$(get_text "msg.keyword_removed") $keyword"
     else
-        echo "錯誤：無法移除關鍵字" >&2
+        echo "$(get_text "error.update_failed")" >&2
         return 1
     fi
 }
@@ -195,12 +208,20 @@ config_reset() {
       "如何",
       "請問",
       "您想",
-      "要選擇"
+      "要選擇",
+      "how to",
+      "what should",
+      "which",
+      "please",
+      "would you like"
     ]
+  },
+  "system": {
+    "language": "auto"
   }
 }
 EOF
-    echo "設定已重設為預設值"
+    echo "$(get_text "msg.config_reset")"
 }
 
 # Main command processing
@@ -239,14 +260,14 @@ case "$1" in
                 config_reset
                 ;;
             *)
-                echo "未知的設定命令: $1" >&2
+                echo "$(get_text "error.unknown_config") $1" >&2
                 show_help
                 exit 1
                 ;;
         esac
         ;;
     monitor)
-        exec "$MAIN_SCRIPT_DIR/claude-monitor.sh"
+        exec "$PROJECT_ROOT/scripts/claude-monitor.sh"
         ;;
     *)
         # Default: send notification
@@ -254,6 +275,6 @@ case "$1" in
             show_help
             exit 1
         fi
-        exec "$MAIN_SCRIPT_DIR/claude-notify.sh" "$@"
+        exec "$PROJECT_ROOT/scripts/claude-notify.sh" "$@"
         ;;
 esac

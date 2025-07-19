@@ -33,9 +33,18 @@ check_for_keywords() {
 # Function to monitor input and trigger notifications
 monitor_for_keywords() {
     local line
+    local silent_mode=false
+    
+    # Check for silent mode flag
+    if [[ "$1" == "--silent" ]]; then
+        silent_mode=true
+    fi
     
     while IFS= read -r line; do
-        echo "$line"  # Pass through the input
+        # Pass through the input only if not in silent mode
+        if [[ "$silent_mode" == "false" ]]; then
+            echo "$line"
+        fi
         
         if check_for_keywords "$line"; then
             # Extract a preview of the message

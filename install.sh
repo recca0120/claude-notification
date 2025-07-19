@@ -1,8 +1,14 @@
 #!/bin/bash
 
-# Claude Notify 安裝腳本
+# Claude Notify Installation Script
 
 set -e
+
+# Get script directory and source i18n
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+REPO_DIR="$SCRIPT_DIR"
+source "$REPO_DIR/lib/config-reader.sh"
+source "$REPO_DIR/lib/i18n.sh"
 
 # 顏色定義
 GREEN='\033[0;32m'
@@ -13,7 +19,6 @@ NC='\033[0m' # No Color
 # 預設安裝路徑
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 CONFIG_DIR="$HOME/.config/claude-notification"
-REPO_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # 顯示訊息
 info() {
@@ -31,33 +36,28 @@ error() {
 
 # 檢查依賴
 check_dependencies() {
-    info "檢查依賴項目..."
+    info "$(get_text "install.checking_deps")"
     
     # 檢查 Homebrew
     if ! command -v brew &> /dev/null; then
-        error "需要安裝 Homebrew。請前往 https://brew.sh 安裝"
+        error "Need to install Homebrew. Please visit https://brew.sh"
     fi
     
-    # 檢查/安裝 terminal-notifier
-    if ! command -v terminal-notifier &> /dev/null; then
-        info "安裝 terminal-notifier..."
-        brew install terminal-notifier
-    else
-        info "terminal-notifier 已安裝"
-    fi
+    # Note: terminal-notifier is no longer needed
+    # We use macOS built-in osascript for notifications
     
     # 檢查/安裝 jq
     if ! command -v jq &> /dev/null; then
-        info "安裝 jq..."
+        info "Installing jq..."
         brew install jq
     else
-        info "jq 已安裝"
+        info "jq already installed"
     fi
 }
 
 # 建立目錄
 create_directories() {
-    info "建立必要目錄..."
+    info "$(get_text "install.creating_dirs")"
     
     mkdir -p "$INSTALL_DIR"
     mkdir -p "$CONFIG_DIR"
@@ -65,25 +65,39 @@ create_directories() {
 
 # 複製檔案
 install_files() {
-    info "安裝程式檔案..."
+    info "$(get_text "install.installing")"
+    
+    # 建立必要的目錄結構
+    LOCAL_INSTALL_BASE="$HOME/.local"
+    mkdir -p "$LOCAL_INSTALL_BASE/bin"
+    mkdir -p "$LOCAL_INSTALL_BASE/lib"
+    mkdir -p "$LOCAL_INSTALL_BASE/scripts"
     
     # 複製主程式
-    cp -f "$REPO_DIR/claude-notify" "$INSTALL_DIR/"
-    chmod +x "$INSTALL_DIR/claude-notify"
+    cp -f "$REPO_DIR/claude-notify" "$LOCAL_INSTALL_BASE/bin/"
+    chmod +x "$LOCAL_INSTALL_BASE/bin/claude-notify"
     
-    # 建立符號連結到其他腳本
-    ln -sf "$REPO_DIR/claude-notify.sh" "$INSTALL_DIR/claude-notify.sh"
-    ln -sf "$REPO_DIR/claude-monitor.sh" "$INSTALL_DIR/claude-monitor.sh"
+    # 複製腳本
+    cp -f "$REPO_DIR/scripts/claude-notify.sh" "$LOCAL_INSTALL_BASE/scripts/"
+    cp -f "$REPO_DIR/scripts/claude-monitor.sh" "$LOCAL_INSTALL_BASE/scripts/"
+    cp -f "$REPO_DIR/scripts/claude-hook-processor.sh" "$LOCAL_INSTALL_BASE/scripts/"
+    chmod +x "$LOCAL_INSTALL_BASE/scripts/"*.sh
     
     # 複製函式庫
-    cp -rf "$REPO_DIR/lib" "$INSTALL_DIR/"
+    cp -rf "$REPO_DIR/lib/"* "$LOCAL_INSTALL_BASE/lib/"
+    
+    # 複製 setup-hooks.sh 到安裝目錄
+    cp -f "$REPO_DIR/setup-hooks.sh" "$LOCAL_INSTALL_BASE/bin/"
+    chmod +x "$LOCAL_INSTALL_BASE/bin/setup-hooks.sh"
     
     # 複製設定檔（如果不存在）
     if [ ! -f "$CONFIG_DIR/config.json" ]; then
         cp "$REPO_DIR/config.json" "$CONFIG_DIR/"
-        info "已建立設定檔: $CONFIG_DIR/config.json"
+        # 同時複製到 .local 目錄以供相容性
+        cp "$REPO_DIR/config.json" "$LOCAL_INSTALL_BASE/"
+        info "$(get_text "install.config_created") $CONFIG_DIR/config.json"
     else
-        warn "設定檔已存在，跳過複製"
+        warn "$(get_text "install.config_exists")"
     fi
 }
 
@@ -123,52 +137,60 @@ setup_path() {
 
 # 互動式設定
 interactive_setup() {
-    echo -e "\n${GREEN}Claude Notify 設定精靈${NC}"
+    echo -e "\n${GREEN}$(get_text "install.setup_wizard")${NC}"
     echo "========================"
     
     # 詢問是否啟用聲音
-    read -p "預設啟用聲音提示？[Y/n] " -n 1 -r
+    read -p "$(get_text "install.enable_sound") " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
         "$INSTALL_DIR/claude-notify" config set notification.sound.enabled true
     fi
     
     # 詢問是否啟用語音
-    read -p "預設啟用語音播報？[y/N] " -n 1 -r
+    read -p "$(get_text "install.enable_speech") " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         "$INSTALL_DIR/claude-notify" config set notification.speech.enabled true
     fi
     
     # 測試通知
-    read -p "要測試通知功能嗎？[Y/n] " -n 1 -r
+    read -p "$(get_text "install.test_notify") " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        "$INSTALL_DIR/claude-notify" "安裝成功" "Claude Notify 已準備就緒！"
+        "$INSTALL_DIR/claude-notify" "$(get_text "install.success_title")" "$(get_text "install.success_msg")"
+    fi
+    
+    # 詢問是否設定 Claude Code hooks
+    echo
+    read -p "Would you like to set up Claude Code hooks integration? (Y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        "$INSTALL_DIR/setup-hooks.sh"
     fi
 }
 
 # 顯示完成訊息
 show_completion() {
     echo
-    echo -e "${GREEN}安裝完成！${NC}"
+    echo -e "${GREEN}$(get_text "install.complete")${NC}"
     echo "========================"
-    echo "claude-notify 已安裝到: $INSTALL_DIR"
-    echo "設定檔位置: $CONFIG_DIR/config.json"
+    echo "claude-notify installed to: $INSTALL_DIR"
+    echo "Config location: $CONFIG_DIR/config.json"
     echo
-    echo "使用方式:"
-    echo "  claude-notify --help    # 顯示說明"
-    echo "  claude-notify config list # 列出設定"
-    echo "  claude-notify monitor   # 啟動監控"
+    echo "Usage:"
+    echo "  claude-notify --help    # Show help"
+    echo "  claude-notify config list # List settings"
+    echo "  claude-notify monitor   # Start monitoring"
     echo
-    echo "與 Claude CLI 整合:"
+    echo "Integration with Claude CLI:"
     echo "  claude | claude-notify monitor"
     echo
 }
 
 # 主程式
 main() {
-    echo -e "${GREEN}Claude Notify 安裝程式${NC}"
+    echo -e "${GREEN}$(get_text "install.title")${NC}"
     echo "======================="
     echo
     
@@ -177,11 +199,15 @@ main() {
     install_files
     setup_path
     
-    # 詢問是否進行互動式設定
-    read -p "要進行互動式設定嗎？[Y/n] " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        interactive_setup
+    # 詢問是否進行互動式設定（檢查是否在互動模式）
+    if [ -t 0 ]; then
+        read -p "$(get_text "install.interactive") " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            interactive_setup
+        fi
+    else
+        info "Running in non-interactive mode, skipping setup wizard"
     fi
     
     show_completion

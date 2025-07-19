@@ -1,0 +1,17 @@
+#!/bin/bash
+# Mock claude-notify for testing
+# This saves notification details to a file for verification
+
+# Get the directory of this script
+MOCK_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "$MOCK_DIR/../.." && pwd )"
+
+# If MOCK_OUTPUT is set, save notification details
+if [ -n "$MOCK_OUTPUT" ]; then
+    echo "Title: $1" > "$MOCK_OUTPUT"
+    echo "Message: $2" >> "$MOCK_OUTPUT"
+    echo "Args: $*" >> "$MOCK_OUTPUT"
+else
+    # Fall back to calling real claude-notify with --test flag
+    "$PROJECT_ROOT/scripts/claude-notify.sh" "$@" --test
+fi
